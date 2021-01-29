@@ -83,24 +83,7 @@ void Render::setModelTransform(float tX, float tY, float tZ, float rX, float rY,
 }
 
 GLFWwindow* Render::InitWindow() {
-    glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Plane", NULL, NULL);
-    if (window == NULL)
-    {
-        std::cout << "Failed to create GLFW window" << std::endl;
-        glfwTerminate();
-        exit(-1);
-    }
-    glfwMakeContextCurrent(window);
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
-        std::cout << "Failed to initialize GLAD" << std::endl; 
-        exit(-1);
-    }
     stbi_set_flip_vertically_on_load(true);
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
     glEnable(GL_DEPTH_TEST);
@@ -244,7 +227,7 @@ void Render::getDepthInfo() {
     glBindTexture(GL_TEXTURE_2D, posTexture);
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_FLOAT, pPos);
     for (int i = 0; i < SCR_WIDTH * SCR_HEIGHT; i++) {
-        if ((pPos[3 * i] - 0.9) < 1e6 && (pPos[3 * i + 1] - 0.6) < 1e6 && (pPos[3 * i + 2] - 0.3) < 1e6) {
+        if ((abs(pPos[3 * i] - 0.9) < 1e-6) && (abs(pPos[3 * i + 1] - 0.6) < 1e-6) && (abs(pPos[3 * i + 2] - 0.3) < 1e-6)) {
             pPos[3 * i] = 1e6;
             pPos[3 * i + 1] = 1e6;
             pPos[3 * i + 2] = 1e6;

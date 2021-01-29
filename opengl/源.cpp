@@ -17,6 +17,9 @@ int main(){
     clock_t start, end;
     start = clock();
 
+    CameraPara C;
+    C.width = 1920; C.height = 1440; C.dx = 5e-6; C.dy = 5e-6; C.f = 0.6125; C.x0 = C.width / 2 + 10; C.y0 = C.height / 2 - 10;
+    custom_glfwInit(C);
     M4f viewmat;
     //viewmat << 0.9691591262817383, -0.2464051693677902, 0.003896102774888277, 11.7416467666626,
     //    -0.003497301368042827, 0.002056083641946316, 0.9999918937683105, 1.788742303848267,
@@ -30,8 +33,6 @@ int main(){
 
     Camera ourCamera(viewmat);
 
-    CameraPara C;
-    C.width = 1920; C.height = 1440; C.dx = 5e-6; C.dy = 5e-6; C.f = 0.6125; C.x0 = C.width/2+10; C.y0 = C.height/2-10;
     ourCamera.setCameraPara(C);
     Render render(&ourCamera);
     render.InitWindow();
@@ -59,3 +60,22 @@ int main(){
     cout << (end - start) / 1000 << endl;
 }
 
+void custom_glfwInit(CameraPara &C) {
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    GLFWwindow* window = glfwCreateWindow(C.width, C.height, "Plane", NULL, NULL);
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        exit(-1);
+    }
+    glfwMakeContextCurrent(window);
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialize GLAD" << std::endl;
+        exit(-1);
+    }
+}
