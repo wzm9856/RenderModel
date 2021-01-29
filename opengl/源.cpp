@@ -40,10 +40,10 @@ int main(){
     render.setSM(&ourShader, &ourModel);
     render.setbgImage("origin.png");
 
-    render.setModelTransform(0, 0, 0, 0,0,0, 0.0257);
+    render.setModelTransform(0, 0, 0, 0, 0, 0, 0.0257);
     render.draw();
-    //render.getDepthInfo();
     render.generateImage();
+    render.getDepthInfo();
 
     //CameraPara C;
     //C.width = 1920; C.height = 1080; C.dx = 0.0001; C.dy = 0.0001; C.f = 1; C.x0 = C.width / 2; C.y0 = C.height / 2;
@@ -56,6 +56,6 @@ int main(){
     //oneStepRender(1920, 1080, "./model/engine_filled-n-37-n.obj", "test.vs", "test.fs", render.getModelMatrix(), ourCamera.getViewMatrix(), ourCamera.getPerspectiveMatrix());
 
     end = clock();
-    cout << end - start << endl;
+    cout << (end - start) / 1000 << endl;
 }
 

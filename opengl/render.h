@@ -57,10 +57,12 @@ private:
     int SCR_HEIGHT;
     unsigned int framebuffer;
     unsigned int textureColorBufferMultiSampled;
+    unsigned int posColorBufferMultiSampled;
     unsigned int rbo;
     unsigned int intermediateFBO;
     unsigned int screenTexture;
-    unsigned int depthtex;
+    unsigned int posTexture;
+    float* pPos = NULL;
     bool dobg = false;
     unsigned int bgVAO;
     unsigned int bgVBO;
@@ -105,12 +107,18 @@ GLFWwindow* Render::InitWindow() {
     glEnable(GL_MULTISAMPLE);
     glGenFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
     // create a multisampled color attachment texture
     glGenTextures(1, &textureColorBufferMultiSampled);
     glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMultiSampled);
     glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGB, SCR_WIDTH, SCR_HEIGHT, GL_TRUE);
-    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMultiSampled, 0);
+
+    glGenTextures(1, &posColorBufferMultiSampled);
+    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, posColorBufferMultiSampled);
+    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGB32F, SCR_WIDTH, SCR_HEIGHT, GL_TRUE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D_MULTISAMPLE, posColorBufferMultiSampled, 0);
+
     // create a (also multisampled) renderbuffer object for depth and stencil attachments
     glGenRenderbuffers(1, &rbo);
     glBindRenderbuffer(GL_RENDERBUFFER, rbo);
@@ -119,34 +127,33 @@ GLFWwindow* Render::InitWindow() {
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
+        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // configure second post-processing framebuffer
+    // 把多重采样变为单重采样的帧缓冲
     glGenFramebuffers(1, &intermediateFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
 
-    glGenTextures(1, &depthtex);
-    glBindTexture(GL_TEXTURE_2D, depthtex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SCR_WIDTH, SCR_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthtex, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    // create a color attachment texture
+    // 用于储存颜色的纹理
     glGenTextures(1, &screenTexture);
     glBindTexture(GL_TEXTURE_2D, screenTexture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, screenTexture, 0);	// we only need a color buffer
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, screenTexture, 0);
+
+    // 用于储存模型坐标的纹理
+    glGenTextures(1, &posTexture);
+    glBindTexture(GL_TEXTURE_2D, posTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, posTexture, 0);
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        cout << "ERROR::FRAMEBUFFER:: Intermediate framebuffer is not complete!" << endl;
+        std::cout << "ERROR::FRAMEBUFFER:: Intermediate framebuffer is not complete!" << endl;
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-    glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
     return window;
 }
 
@@ -189,8 +196,10 @@ void Render::setbgImage(const char* imagePath) {
 }
 
 void Render::draw() {
-    glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    const float color1[] = { 0.3,0.6,0.9,1.0 };
+    glClearBufferfv(GL_COLOR, 0, color1);
     // 先画背景（如果有）
     if (dobg) { 
         bgshader->use();
@@ -200,14 +209,24 @@ void Render::draw() {
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
     }
+    const GLenum buffers[]{ GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, buffers);
+    const float color2[] = { 0.9, 0.6, 0.3, 1 };
+    glClearBufferfv(GL_COLOR, 1, color2);       // 模型坐标信息不需要背景，在画模型之前要clear一下背景
     model->Draw(*shader);
+
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, intermediateFBO);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glReadBuffer(GL_COLOR_ATTACHMENT1);
+    glDrawBuffer(GL_COLOR_ATTACHMENT1);
+    glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
 }
 
 void Render::generateImage(const char* outputpath) {
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, intermediateFBO);
-    glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
     GLubyte* pPixelData = new GLubyte[SCR_HEIGHT * SCR_WIDTH * 3];
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, screenTexture);
@@ -216,19 +235,21 @@ void Render::generateImage(const char* outputpath) {
 
     stbi_flip_vertically_on_write(true);
     stbi_write_png(outputpath, SCR_WIDTH, SCR_HEIGHT, 3, pPixelData, 3 * SCR_WIDTH);
+    delete pPixelData;
 }
 
 void Render::getDepthInfo() {
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, intermediateFBO);
-    glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, intermediateFBO);
-    GLubyte* pPixelData = new GLubyte[SCR_HEIGHT * SCR_WIDTH];
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, depthtex);
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, pPixelData);
-    //glReadPixels(0, 0, SCR_WIDTH, SCR_HEIGHT, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, pPixelData);
-    stbi_write_jpg("depth.jpg", SCR_WIDTH, SCR_HEIGHT, 1, pPixelData, SCR_WIDTH);
+    pPos = new float[SCR_HEIGHT * SCR_WIDTH * 3];
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, posTexture);
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_FLOAT, pPos);
+    for (int i = 0; i < SCR_WIDTH * SCR_HEIGHT; i++) {
+        if ((pPos[3 * i] - 0.9) < 1e6 && (pPos[3 * i + 1] - 0.6) < 1e6 && (pPos[3 * i + 2] - 0.3) < 1e6) {
+            pPos[3 * i] = 1e6;
+            pPos[3 * i + 1] = 1e6;
+            pPos[3 * i + 2] = 1e6;
+        }
+    }
 }
 
 void oneStepRender(int SCR_WIDTH, int SCR_HEIGHT, const char* modelFilepath, const char* vsFilepath, const char* fsFilepath, M4f modelMat, M4f viewMat, M4f perspectiveMat, const char* outputpath = "outputOnestep.png") {
