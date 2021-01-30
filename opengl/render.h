@@ -43,7 +43,7 @@ public:
     void setbgImage(const char* imagePath);
     // need image height and width to initalize window object, so Camera object is needed. 
     // parameters other than image size can be changed later.
-    GLFWwindow* InitWindow();
+    void InitRender();
 
     void draw();
     void generateImage(const char* filepath = "output.png");
@@ -82,7 +82,7 @@ void Render::setModelTransform(float tX, float tY, float tZ, float rX, float rY,
     shader->setMat4("model", modelM);
 }
 
-GLFWwindow* Render::InitWindow() {
+void Render::InitRender() {
 
     stbi_set_flip_vertically_on_load(true);
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
@@ -136,8 +136,6 @@ GLFWwindow* Render::InitWindow() {
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         std::cout << "ERROR::FRAMEBUFFER:: Intermediate framebuffer is not complete!" << endl;
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-
-    return window;
 }
 
 void Render::setbgImage(const char* imagePath) {
@@ -179,10 +177,12 @@ void Render::setbgImage(const char* imagePath) {
 }
 
 void Render::draw() {
-    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    const GLenum buffers[]{ GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, buffers);
     glClear(GL_DEPTH_BUFFER_BIT);
     const float color1[] = { 0.3,0.6,0.9,1.0 };
     glClearBufferfv(GL_COLOR, 0, color1);
+    glClearBufferfv(GL_COLOR, 1, color1);
     // 先画背景（如果有）
     if (dobg) { 
         bgshader->use();
@@ -192,10 +192,6 @@ void Render::draw() {
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
     }
-    const GLenum buffers[]{ GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-    glDrawBuffers(2, buffers);
-    const float color2[] = { 0.9, 0.6, 0.3, 1 };
-    glClearBufferfv(GL_COLOR, 1, color2);       // 模型坐标信息不需要背景，在画模型之前要clear一下背景
     model->Draw(*shader);
 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
@@ -226,19 +222,11 @@ void Render::getDepthInfo() {
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, posTexture);
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_FLOAT, pPos);
-    for (int i = 0; i < SCR_WIDTH * SCR_HEIGHT; i++) {
-        if ((abs(pPos[3 * i] - 0.9) < 1e-6) && (abs(pPos[3 * i + 1] - 0.6) < 1e-6) && (abs(pPos[3 * i + 2] - 0.3) < 1e-6)) {
-            pPos[3 * i] = 1e6;
-            pPos[3 * i + 1] = 1e6;
-            pPos[3 * i + 2] = 1e6;
-        }
-    }
 }
 
 void oneStepRender(int SCR_WIDTH, int SCR_HEIGHT, const char* modelFilepath, const char* vsFilepath, const char* fsFilepath, M4f modelMat, M4f viewMat, M4f perspectiveMat, const char* outputpath = "outputOnestep.png") {
     Camera camera(SCR_WIDTH, SCR_HEIGHT, viewMat, perspectiveMat);
     Render render(&camera);
-    render.InitWindow();
     Shader shader(vsFilepath, fsFilepath);
     Model model(modelFilepath);
     render.setSM(&shader, &model);

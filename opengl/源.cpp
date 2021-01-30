@@ -13,6 +13,27 @@
 #include "model.h"
 #include "camera.h"
 #include "render.h"
+
+void custom_glfwInit(CameraPara& C) {
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    GLFWwindow* window = glfwCreateWindow(C.width, C.height, "Plane", NULL, NULL);
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        exit(-1);
+    }
+    glfwMakeContextCurrent(window);
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialize GLAD" << std::endl;
+        exit(-1);
+    }
+}
+
 int main(){
     clock_t start, end;
     start = clock();
@@ -35,7 +56,7 @@ int main(){
 
     ourCamera.setCameraPara(C);
     Render render(&ourCamera);
-    render.InitWindow();
+    render.InitRender();
     Shader ourShader("objectShader.vs", "objectShader.fs");
     Model ourModel("./model/plane.obj");
     render.setSM(&ourShader, &ourModel);
@@ -60,22 +81,3 @@ int main(){
     cout << (end - start) / 1000 << endl;
 }
 
-void custom_glfwInit(CameraPara &C) {
-    glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    GLFWwindow* window = glfwCreateWindow(C.width, C.height, "Plane", NULL, NULL);
-    if (window == NULL)
-    {
-        std::cout << "Failed to create GLFW window" << std::endl;
-        glfwTerminate();
-        exit(-1);
-    }
-    glfwMakeContextCurrent(window);
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
-        std::cout << "Failed to initialize GLAD" << std::endl;
-        exit(-1);
-    }
-}
