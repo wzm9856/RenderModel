@@ -13,7 +13,7 @@
 #include "model.h"
 #include "camera.h"
 #include "render.h"
-
+ 
 void custom_glfwInit(CameraPara& C) {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
