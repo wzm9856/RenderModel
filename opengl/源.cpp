@@ -56,26 +56,16 @@ int main(){
 
     ourCamera.setCameraPara(C);
     Render render(&ourCamera);
-    render.InitRender();
     Shader ourShader("objectShader.vs", "objectShader.fs");
     Model ourModel("./model/plane.obj");
     render.setSM(&ourShader, &ourModel);
     render.setbgImage("origin.png");
+    render.setFrameBuffer(WZM_MSAA_DISABLE);
 
     render.setModelTransform(0, 0, 0, 0, 0, 0, 0.0257);
-    render.draw();
+    render.draw(WZM_MSAA_DISABLE);
     render.generateImage();
     render.getDepthInfo();
-
-    //CameraPara C;
-    //C.width = 1920; C.height = 1080; C.dx = 0.0001; C.dy = 0.0001; C.f = 1; C.x0 = C.width / 2; C.y0 = C.height / 2;
-    //Camera ourCamera(C);
-    //Render render(&ourCamera);
-    //render.InitWindow();
-    //Shader ourShader("test.vs", "test.fs");
-    //render.setSM(&ourShader, NULL);
-    //render.setModelTransform(0, 0, -400, PI / 4, PI / 4, PI / 4, 0.2);
-    //oneStepRender(1920, 1080, "./model/engine_filled-n-37-n.obj", "test.vs", "test.fs", render.getModelMatrix(), ourCamera.getViewMatrix(), ourCamera.getPerspectiveMatrix());
 
     end = clock();
     cout << (end - start) / 1000 << endl;

@@ -7,13 +7,13 @@
 #include "model.h"
 typedef Eigen::Vector3f V3f;
 typedef Eigen::Matrix4f M4f;
+
+#define WZM_MSAA_ENABLE 1
+#define WZM_MSAA_DISABLE 2
+
 class Render {
 public:
-    Render(Camera* c) {
-        camera = c;
-        SCR_WIDTH = camera->getWidth();
-        SCR_HEIGHT = camera->getHeight();
-    }
+    Render(Camera* c);
     void setC(Camera* c) { 
         if (c->getWidth() != SCR_WIDTH || c->getHeight() != SCR_HEIGHT) {
             throw "图像尺寸不同时需要创建不同的Render对象";
@@ -36,17 +36,13 @@ public:
     }
     void setM(Model* m) { model = m; }
 
-    // need radian as rotation input
     void setModelTransform(float tX, float tY, float tZ, float rX, float rY, float rZ, float scale);
     M4f getModelMatrix() { return modelMatrix; }
-    void getDepthInfo();
     void setbgImage(const char* imagePath);
-    // need image height and width to initalize window object, so Camera object is needed. 
-    // parameters other than image size can be changed later.
-    void InitRender();
-
-    void draw();
+    void setFrameBuffer(int parameter);
+    void draw(int parameter);
     void generateImage(const char* filepath = "output.png");
+    void getDepthInfo();
 private:
     Camera* camera;
     Shader* shader = NULL;
@@ -82,42 +78,36 @@ void Render::setModelTransform(float tX, float tY, float tZ, float rX, float rY,
     shader->setMat4("model", modelM);
 }
 
-void Render::InitRender() {
+Render::Render(Camera* c){
+    camera = c;
+    SCR_WIDTH = camera->getWidth();
+    SCR_HEIGHT = camera->getHeight();
 
     stbi_set_flip_vertically_on_load(true);
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
+
+    //准备好framebuffer和intermediateFBO，之后需要哪个就往哪里画
     glGenFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
-    // create a multisampled color attachment texture
     glGenTextures(1, &textureColorBufferMultiSampled);
     glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMultiSampled);
     glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGB, SCR_WIDTH, SCR_HEIGHT, GL_TRUE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMultiSampled, 0);
 
-    glGenTextures(1, &posColorBufferMultiSampled);
-    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, posColorBufferMultiSampled);
-    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGB32F, SCR_WIDTH, SCR_HEIGHT, GL_TRUE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D_MULTISAMPLE, posColorBufferMultiSampled, 0);
-
-    // create a (also multisampled) renderbuffer object for depth and stencil attachments
     glGenRenderbuffers(1, &rbo);
     glBindRenderbuffer(GL_RENDERBUFFER, rbo);
     glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH_COMPONENT, SCR_WIDTH, SCR_HEIGHT);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
 
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // 把多重采样变为单重采样的帧缓冲
+    // intermediateFBO
     glGenFramebuffers(1, &intermediateFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
 
-    // 用于储存颜色的纹理
     glGenTextures(1, &screenTexture);
     glBindTexture(GL_TEXTURE_2D, screenTexture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
@@ -125,13 +115,19 @@ void Render::InitRender() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, screenTexture, 0);
 
-    // 用于储存模型坐标的纹理
     glGenTextures(1, &posTexture);
     glBindTexture(GL_TEXTURE_2D, posTexture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, posTexture, 0);
+
+    unsigned int rbo2;
+    glGenRenderbuffers(1, &rbo2);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo2);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, SCR_WIDTH, SCR_HEIGHT);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo2);
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         std::cout << "ERROR::FRAMEBUFFER:: Intermediate framebuffer is not complete!" << endl;
@@ -176,15 +172,28 @@ void Render::setbgImage(const char* imagePath) {
     stbi_image_free(data);
 }
 
-void Render::draw() {
-    const GLenum buffers[]{ GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-    glDrawBuffers(2, buffers);
-    glClear(GL_DEPTH_BUFFER_BIT);
-    const float color1[] = { 0.3,0.6,0.9,1.0 };
-    glClearBufferfv(GL_COLOR, 0, color1);
-    glClearBufferfv(GL_COLOR, 1, color1);
-    // 先画背景（如果有）
-    if (dobg) { 
+void Render::setFrameBuffer(int parameter) {
+    // 开启抗锯齿时只渲染颜色，进入framebuffer，之后转移到intermediaFBO中
+    // 关闭抗锯齿时同时渲染颜色和坐标位置，直接渲染进intermediaFBO
+    // 所以最后找东西都直接去 中间FBO 找
+    if (parameter == WZM_MSAA_ENABLE) {
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        glDrawBuffer(GL_COLOR_ATTACHMENT0);
+        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+    }
+    else if (parameter == WZM_MSAA_DISABLE) {
+        glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
+        const GLenum buffers[]{ GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+        glDrawBuffers(2, buffers);
+        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+    }
+    else {
+        throw "传入参数好奇怪";
+    }
+}
+
+void Render::draw(int parameter){
+    if (dobg) {
         bgshader->use();
         bgshader->setInt("bgTexture", 0);
         glBindVertexArray(bgVAO);
@@ -192,45 +201,63 @@ void Render::draw() {
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
     }
-    model->Draw(*shader);
+    model->Draw(*shader);    
 
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, intermediateFBO);
-    glReadBuffer(GL_COLOR_ATTACHMENT0);
-    glDrawBuffer(GL_COLOR_ATTACHMENT0);
-    glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-    glReadBuffer(GL_COLOR_ATTACHMENT1);
-    glDrawBuffer(GL_COLOR_ATTACHMENT1);
-    glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-    glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
+    if (parameter == WZM_MSAA_ENABLE) {
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, intermediateFBO);
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
+        glDrawBuffer(GL_COLOR_ATTACHMENT0);
+        glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
+    }
+    else if (parameter == WZM_MSAA_DISABLE) {
+        return;
+    }
 }
 
+//void Render::draw() {
+//    const GLenum buffers[]{ GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+//    glDrawBuffers(2, buffers);
+//    glClear(GL_DEPTH_BUFFER_BIT);
+//    const float color1[] = { 0.3,0.6,0.9,1.0 };
+//    glClearBufferfv(GL_COLOR, 0, color1);
+//    glClearBufferfv(GL_COLOR, 1, color1);
+//    // 先画背景（如果有）
+//    if (dobg) { 
+//        bgshader->use();
+//        bgshader->setInt("bgTexture", 0);
+//        glBindVertexArray(bgVAO);
+//        glBindTexture(GL_TEXTURE_2D, bgTexture);
+//        glDrawArrays(GL_TRIANGLES, 0, 6);
+//        glBindVertexArray(0);
+//    }
+//    model->Draw(*shader);
+//
+//    glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
+//    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, intermediateFBO);
+//    glReadBuffer(GL_COLOR_ATTACHMENT0);
+//    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+//    glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+//    glReadBuffer(GL_COLOR_ATTACHMENT1);
+//    glDrawBuffer(GL_COLOR_ATTACHMENT1);
+//    glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+//    glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
+//}
+
 void Render::generateImage(const char* outputpath) {
-    GLubyte* pPixelData = new GLubyte[SCR_HEIGHT * SCR_WIDTH * 3];
+    GLubyte* pPixelData = new GLubyte[(long)SCR_HEIGHT * SCR_WIDTH * 3];
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, screenTexture);
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, pPixelData);
-    //glReadPixels(0, 0, SCR_WIDTH, SCR_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, pPixelData);
-
     stbi_flip_vertically_on_write(true);
     stbi_write_png(outputpath, SCR_WIDTH, SCR_HEIGHT, 3, pPixelData, 3 * SCR_WIDTH);
-    delete pPixelData;
+    delete[] pPixelData;
 }
 
 void Render::getDepthInfo() {
-    pPos = new float[SCR_HEIGHT * SCR_WIDTH * 3];
+    pPos = new float[(long)SCR_HEIGHT * SCR_WIDTH * 3];
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, posTexture);
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_FLOAT, pPos);
-}
-
-void oneStepRender(int SCR_WIDTH, int SCR_HEIGHT, const char* modelFilepath, const char* vsFilepath, const char* fsFilepath, M4f modelMat, M4f viewMat, M4f perspectiveMat, const char* outputpath = "outputOnestep.png") {
-    Camera camera(SCR_WIDTH, SCR_HEIGHT, viewMat, perspectiveMat);
-    Render render(&camera);
-    Shader shader(vsFilepath, fsFilepath);
-    Model model(modelFilepath);
-    render.setSM(&shader, &model);
-    shader.setMat4("model", modelMat);
-    render.draw();
-    render.generateImage(outputpath);
 }
