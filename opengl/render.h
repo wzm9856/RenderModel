@@ -24,6 +24,8 @@ public:
             M4f view = camera->getViewMatrix();
             bodyShader->setMat4("perspective", perspective);
             bodyShader->setMat4("view", view);
+            wingShader->setMat4("perspective", perspective);
+            wingShader->setMat4("view", view);
         }
     }
     void setSM(Shader* wingS, Shader* bodyS, Model* wingM, Model* bodyM) {
@@ -207,8 +209,8 @@ void Render::draw(int parameter){
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
     }
+    bodyModel->Draw(*bodyShader);
     wingModel->Draw(*wingShader);
-    bodyModel->Draw(*bodyShader);   
 
     if (parameter == WZM_MSAA_ENABLE) {
         glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
