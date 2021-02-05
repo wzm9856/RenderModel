@@ -19,7 +19,7 @@ public:
             throw "图像尺寸不同时需要创建不同的Render对象";
         }
         camera = c; 
-        if (bodyShader != NULL) {
+        if (bodyShader != NULL && wingShader != NULL) {
             M4f perspective = camera->getPerspectiveMatrix();
             M4f view = camera->getViewMatrix();
             bodyShader->setMat4("perspective", perspective);
@@ -30,14 +30,6 @@ public:
     }
     void setSM(Shader* wingS, Shader* bodyS, Model* wingM, Model* bodyM) {
         wingShader = wingS; bodyShader = bodyS; bodyModel = bodyM; wingModel = wingM;
-        M4f perspective = camera->getPerspectiveMatrix();
-        M4f view = camera->getViewMatrix();
-        wingShader->use();
-        wingShader->setMat4("perspective", perspective);
-        wingShader->setMat4("view", view);
-        bodyShader->use();
-        bodyShader->setMat4("perspective", perspective);
-        bodyShader->setMat4("view", view);
     }
     void setM(Model* bodyM, Model* wingM) { bodyModel = bodyM; wingModel = wingM; }
 
@@ -82,8 +74,6 @@ void Render::setModelTransform(float tX, float tY, float tZ, float rX, float rY,
     modelM.block<3, 1>(0, 3) = translation;
     modelM.block<3, 3>(0, 0) = scale * rotation;
     modelMatrix = modelM;
-    wingShader->setMat4("model", modelM);
-    bodyShader->setMat4("model", modelM);
 }
 
 Render::Render(Camera* c){
@@ -209,7 +199,19 @@ void Render::draw(int parameter){
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
     }
+
+    M4f perspective = camera->getPerspectiveMatrix();
+    M4f view = camera->getViewMatrix();
+    bodyShader->use();
+    bodyShader->setMat4("perspective", perspective);
+    bodyShader->setMat4("view", view);
+    bodyShader->setMat4("model", modelMatrix);
     bodyModel->Draw(*bodyShader);
+
+    wingShader->use();
+    wingShader->setMat4("perspective", perspective);
+    wingShader->setMat4("view", view);
+    wingShader->setMat4("model", modelMatrix);
     wingModel->Draw(*wingShader);
 
     if (parameter == WZM_MSAA_ENABLE) {

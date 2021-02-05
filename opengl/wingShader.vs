@@ -15,6 +15,6 @@ void main()
     float z_calib_mm = -6E-23*pow(x_mm,6) + 1E-28*pow(x_mm,5) + 4E-14*pow(x_mm,4) + 3E-19*pow(x_mm,3) + 2E-06*pow(x_mm,2) - 5E-11*x_mm - 54.852;
     float z_calib_inch = z_calib_mm/25.7;
     Pos = aPos;
-    Pos[2] = 0;
-    gl_Position = perspective * view * model * vec4(aPos, 1.0);
+    Pos.z = Pos.z+z_calib_inch;
+    gl_Position = perspective * view * model * vec4(Pos, 1.0);
 }
