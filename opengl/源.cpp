@@ -39,27 +39,28 @@ int main(){
     start = clock();
 
     CameraPara C;
-    C.width = 1920; C.height = 1440; C.dx = 5e-6; C.dy = 5e-6; C.f = 0.1825; C.x0 = C.width / 2 + 10; C.y0 = C.height / 2 - 10;
+    C.width = 1920; C.height = 1440; C.dx = 5e-6; C.dy = 5e-6; C.f = 0.6125; C.x0 = C.width / 2 + 10; C.y0 = C.height / 2 - 10;
     custom_glfwInit(C);
     M4f viewmat;
-    viewmat << 0.9691591262817383, -0.2464051693677902, 0.003896102774888277, 11.7416467666626,
-        -0.003497301368042827, 0.002056083641946316, 0.9999918937683105, 1.788742303848267,
-        -0.246411144733429, -0.9691647887229919, 0.001130918972194195, -1540.308349609375,
-        0, 0, 0, 1;
-    //viewmat << -0.9965885877609253, -0.08214690536260605, -0.007943005301058292, -0.02309185080230236,
-    //    -0.01408948749303818, 0.07451639324426651, 0.9971202611923218, 2.110600709915161,
-    //    -0.08131846040487289, 0.9938305616378784, -0.0754195973277092, -4556.015625,
+    //viewmat << 0.9691591262817383, -0.2464051693677902, 0.003896102774888277, 11.7416467666626,
+    //    -0.003497301368042827, 0.002056083641946316, 0.9999918937683105, 1.788742303848267,
+    //    -0.246411144733429, -0.9691647887229919, 0.001130918972194195, -1540.308349609375,
     //    0, 0, 0, 1;
+    viewmat << -0.9965885877609253, -0.08214690536260605, -0.007943005301058292, -0.02309185080230236,
+        -0.01408948749303818, 0.07451639324426651, 0.9971202611923218, 2.110600709915161,
+        -0.08131846040487289, 0.9938305616378784, -0.0754195973277092, -4556.015625,
+        0, 0, 0, 1;
 
 
     Camera ourCamera(viewmat);
 
     ourCamera.setCameraPara(C);
     Render render(&ourCamera);
-    Shader ourShader("objectShader.vs", "objectShader.fs");
+    Shader bodyShader("objectShader.vs", "objectShader.fs");
+    Shader wingShader("wingShader.vs", "objectShader.fs");
     Model wingModel("./model/wing.obj");
     Model bodyModel("./model/body.obj");
-    render.setSM(&ourShader, &wingModel, &bodyModel);
+    render.setSM(&wingShader, &bodyShader, &wingModel, &bodyModel);
     render.setbgImage("origin.png");
     render.setFrameBuffer(WZM_MSAA_DISABLE);
 

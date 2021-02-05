@@ -19,20 +19,23 @@ public:
             throw "图像尺寸不同时需要创建不同的Render对象";
         }
         camera = c; 
-        if (shader != NULL) {
+        if (bodyShader != NULL) {
             M4f perspective = camera->getPerspectiveMatrix();
             M4f view = camera->getViewMatrix();
-            shader->setMat4("perspective", perspective);
-            shader->setMat4("view", view);
+            bodyShader->setMat4("perspective", perspective);
+            bodyShader->setMat4("view", view);
         }
     }
-    void setSM(Shader* s, Model* bodyM, Model* wingM) { 
-        shader = s; bodyModel = bodyM; wingModel = wingM;
-        shader->use(); 
+    void setSM(Shader* wingS, Shader* bodyS, Model* wingM, Model* bodyM) {
+        wingShader = wingS; bodyShader = bodyS; bodyModel = bodyM; wingModel = wingM;
         M4f perspective = camera->getPerspectiveMatrix();
         M4f view = camera->getViewMatrix();
-        shader->setMat4("perspective", perspective);
-        shader->setMat4("view", view);
+        wingShader->use();
+        wingShader->setMat4("perspective", perspective);
+        wingShader->setMat4("view", view);
+        bodyShader->use();
+        bodyShader->setMat4("perspective", perspective);
+        bodyShader->setMat4("view", view);
     }
     void setM(Model* bodyM, Model* wingM) { bodyModel = bodyM; wingModel = wingM; }
 
@@ -45,7 +48,8 @@ public:
     void getDepthInfo();
 private:
     Camera* camera;
-    Shader* shader = NULL;
+    Shader* bodyShader = NULL;
+    Shader* wingShader = NULL;
     Shader* bgshader;
     Model* bodyModel = NULL;
     Model* wingModel = NULL;
@@ -76,7 +80,8 @@ void Render::setModelTransform(float tX, float tY, float tZ, float rX, float rY,
     modelM.block<3, 1>(0, 3) = translation;
     modelM.block<3, 3>(0, 0) = scale * rotation;
     modelMatrix = modelM;
-    shader->setMat4("model", modelM);
+    wingShader->setMat4("model", modelM);
+    bodyShader->setMat4("model", modelM);
 }
 
 Render::Render(Camera* c){
@@ -202,8 +207,8 @@ void Render::draw(int parameter){
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
     }
-    bodyModel->Draw(*shader);   
-    wingModel->Draw(*shader);
+    wingModel->Draw(*wingShader);
+    bodyModel->Draw(*bodyShader);   
 
     if (parameter == WZM_MSAA_ENABLE) {
         glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
