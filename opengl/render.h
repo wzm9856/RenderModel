@@ -26,15 +26,15 @@ public:
             shader->setMat4("view", view);
         }
     }
-    void setSM(Shader* s, Model* m) { 
-        shader = s; model = m; 
+    void setSM(Shader* s, Model* bodyM, Model* wingM) { 
+        shader = s; bodyModel = bodyM; wingModel = wingM;
         shader->use(); 
         M4f perspective = camera->getPerspectiveMatrix();
         M4f view = camera->getViewMatrix();
         shader->setMat4("perspective", perspective);
         shader->setMat4("view", view);
     }
-    void setM(Model* m) { model = m; }
+    void setM(Model* bodyM, Model* wingM) { bodyModel = bodyM; wingModel = wingM; }
 
     void setModelTransform(float tX, float tY, float tZ, float rX, float rY, float rZ, float scale);
     M4f getModelMatrix() { return modelMatrix; }
@@ -47,7 +47,8 @@ private:
     Camera* camera;
     Shader* shader = NULL;
     Shader* bgshader;
-    Model* model = NULL;
+    Model* bodyModel = NULL;
+    Model* wingModel = NULL;
     M4f modelMatrix;
     int SCR_WIDTH;
     int SCR_HEIGHT;
@@ -201,7 +202,8 @@ void Render::draw(int parameter){
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
     }
-    model->Draw(*shader);    
+    bodyModel->Draw(*shader);   
+    wingModel->Draw(*shader);
 
     if (parameter == WZM_MSAA_ENABLE) {
         glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
@@ -215,35 +217,6 @@ void Render::draw(int parameter){
         return;
     }
 }
-
-//void Render::draw() {
-//    const GLenum buffers[]{ GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-//    glDrawBuffers(2, buffers);
-//    glClear(GL_DEPTH_BUFFER_BIT);
-//    const float color1[] = { 0.3,0.6,0.9,1.0 };
-//    glClearBufferfv(GL_COLOR, 0, color1);
-//    glClearBufferfv(GL_COLOR, 1, color1);
-//    // 先画背景（如果有）
-//    if (dobg) { 
-//        bgshader->use();
-//        bgshader->setInt("bgTexture", 0);
-//        glBindVertexArray(bgVAO);
-//        glBindTexture(GL_TEXTURE_2D, bgTexture);
-//        glDrawArrays(GL_TRIANGLES, 0, 6);
-//        glBindVertexArray(0);
-//    }
-//    model->Draw(*shader);
-//
-//    glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
-//    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, intermediateFBO);
-//    glReadBuffer(GL_COLOR_ATTACHMENT0);
-//    glDrawBuffer(GL_COLOR_ATTACHMENT0);
-//    glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-//    glReadBuffer(GL_COLOR_ATTACHMENT1);
-//    glDrawBuffer(GL_COLOR_ATTACHMENT1);
-//    glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-//    glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
-//}
 
 void Render::generateImage(const char* outputpath) {
     GLubyte* pPixelData = new GLubyte[(long)SCR_HEIGHT * SCR_WIDTH * 3];

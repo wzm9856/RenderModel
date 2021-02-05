@@ -6,6 +6,7 @@
 *.filters
 *.png
 *.jpg
+*.max
 stb_image.h
 stb_image_write.h
 *.sln
