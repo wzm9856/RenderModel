@@ -242,4 +242,9 @@ void Render::getDepthInfo() {
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, posTexture);
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_FLOAT, pPos);
+    //for (int i = 0; i < SCR_HEIGHT * SCR_WIDTH; i++) {
+    //    if (pPos[3 * i] < -100) {
+    //        cout << pPos[3 * i] << " " << pPos[3 * i + 1] << " " << pPos[3 * i + 2] << " " << endl;
+    //    }
+    //}
 }

@@ -61,10 +61,10 @@ int main(){
     Model wingModel("./model/wing.obj");
     Model bodyModel("./model/body.obj");
     render.setSM(&wingShader, &bodyShader, &wingModel, &bodyModel);
-    render.setbgImage("origin.png");
+    render.setbgImage("origin2.png");
     render.setFrameBuffer(WZM_MSAA_DISABLE);
 
-    render.setModelTransform(0, 0, 0, 0, 0, 0, 0.0257);
+    render.setModelTransform(0, 0, 0, 0, 0, 0, 0.0254);
     render.draw(WZM_MSAA_DISABLE);
     render.generateImage();
     render.getDepthInfo();
