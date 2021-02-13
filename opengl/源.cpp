@@ -60,6 +60,9 @@ int main(){
     Shader wingShader("wingShader.vs", "objectShader.fs");
     Model wingModel("./model/wing.obj");
     Model bodyModel("./model/body.obj");
+    float coefficient[] = { -6.279e-23, 1.302e-28, 4.245e-14, 2.873e-19, 2.453e-06, -5.177e-11, -54.852 };
+    wingModel.wingTransform(coefficient, 7);
+
     render.setSM(&wingShader, &bodyShader, &wingModel, &bodyModel);
     render.setbgImage("origin2.png");
     render.setFrameBuffer(WZM_MSAA_DISABLE);

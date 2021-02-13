@@ -43,6 +43,24 @@ public:
             meshes[i].Draw(shader);
     }
 
+    void wingTransform(float* coefficient, int length) {
+        float x_mm, z_calib_mm, z_calib_inch;
+        for (int i = 0; i < this->meshes.size(); i++) {
+            for (int j = 0; j < this->meshes[i].vertices.size(); j++) {
+                V3f* position = &(this->meshes[i].vertices[j].Position);
+                x_mm = position->x() * 25.4;
+                z_calib_mm = 0;
+                for (int a = 0; a < length; a++) {
+                    z_calib_mm = z_calib_mm * x_mm;
+                    z_calib_mm = z_calib_mm + coefficient[a];
+                }
+                z_calib_inch = z_calib_mm /254;
+                position->z() = position->z() + z_calib_inch;
+            }
+            this->meshes[i].setup();
+        }
+    }
+
 private:
     // loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
     void loadModel(string const& path)

@@ -212,7 +212,7 @@ void Render::draw(int parameter){
     wingShader->setMat4("perspective", perspective);
     wingShader->setMat4("view", view);
     wingShader->setMat4("model", modelMatrix);
-    wingModel->Draw(*wingShader);
+    wingModel->Draw(*bodyShader);
 
     if (parameter == WZM_MSAA_ENABLE) {
         glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);

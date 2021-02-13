@@ -89,10 +89,14 @@ public:
         // always good practice to set everything back to defaults once configured.
         glActiveTexture(GL_TEXTURE0);
     }
+    void setup() {
+        setupMesh();
+    }
 
 private:
     // render data 
-    unsigned int VBO, EBO;
+    unsigned int VBO;
+    unsigned int EBO;
 
     // initializes all the buffer objects/arrays
     void setupMesh()
@@ -101,7 +105,6 @@ private:
         glGenVertexArrays(1, &VAO);
         glGenBuffers(1, &VBO);
         glGenBuffers(1, &EBO);
-
         glBindVertexArray(VAO);
         // load data into vertex buffers
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
