@@ -27,12 +27,22 @@ public:
     vector<Texture> textures_loaded;	// stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
     vector<Mesh>    meshes;
     string directory;
-    bool gammaCorrection;
+    const aiScene* scene;
+    int wingCalibCoefLen;
+    float* wingCalibCoef;
 
     // constructor, expects a filepath to a 3D model.
-    Model(string const& path, bool gamma = false) : gammaCorrection(gamma)
+    Model(string const& path, int len = 0, float* coef = NULL): wingCalibCoefLen(len)
     {
+        wingCalibCoef = new float[len];  //
+        for (int i = 0; i < len; i++) {
+            wingCalibCoef[i] = coef[i];
+        }
         loadModel(path);
+    }
+
+    void saveModel(string const& path = "./model/output.obj") {
+        Assimp::Exporter::Export(scene, 'obj', path);
     }
 
     // draws the model, and thus all its meshes
@@ -43,6 +53,7 @@ public:
             meshes[i].Draw(shader);
     }
 
+    // this function one only changes the data inside the self-defined class Model, data in aiScene is not changed.
     void wingTransform(float* coefficient, int length) {
         float x_mm, z_calib_mm, z_calib_inch;
         for (int i = 0; i < this->meshes.size(); i++) {
@@ -67,7 +78,11 @@ private:
     {
         // read file via ASSIMP
         Assimp::Importer importer;
-        const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
+        scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
+        // TODO: 怎么就能在这赋值给const变量了，是什么时候初始化的？左值右值
+        // TODO: 为什么vs的任务列表不识别这个TODO
+        // TODO: 研究一下怎么用vscode
+
         // check for errors
         if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // if is Not Zero
         {
@@ -117,6 +132,7 @@ private:
             vector.x() = mesh->mVertices[i].x;
             vector.y() = mesh->mVertices[i].y;
             vector.z() = mesh->mVertices[i].z;
+            if(wingCalibCoefLen) vector = wingTransform(vector);
             vertex.Position = vector;
             // normals
             if (mesh->HasNormals())
@@ -187,6 +203,20 @@ private:
 
         // return a mesh object created from the extracted mesh data
         return Mesh(vertices, indices, textures, diffuse);
+    }
+
+    Eigen::Vector3f wingTransform(Eigen::Vector3f vec) {
+        float x_mm, z_calib_mm, z_calib_inch;
+        x_mm = vec.x() * 25.4;
+        z_calib_mm = 0;
+        for (int a = 0; a < wingCalibCoefLen; a++) {
+            z_calib_mm = z_calib_mm * x_mm;
+            z_calib_mm = z_calib_mm + wingCalibCoef[a];
+        }
+        z_calib_inch = z_calib_mm / 254;
+        vec.z() = vec.z() + z_calib_inch;
+        //vec.z() = 200;
+        return vec;
     }
 
     // checks all material textures of a given type and loads the textures if they're not loaded yet.
