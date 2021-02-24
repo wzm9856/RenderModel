@@ -5,8 +5,10 @@
 
 #include <stb_image.h>
 #include <assimp/Importer.hpp>
+#include <assimp/Exporter.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/SceneCombiner.h>
 
 #include "mesh.h"
 #include "shader.h"
@@ -27,22 +29,31 @@ public:
     vector<Texture> textures_loaded;	// stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
     vector<Mesh>    meshes;
     string directory;
-    const aiScene* scene;
+    aiScene* pscene;
     int wingCalibCoefLen;
     float* wingCalibCoef;
+    float wingCalibG;
 
     // constructor, expects a filepath to a 3D model.
-    Model(string const& path, int len = 0, float* coef = NULL): wingCalibCoefLen(len)
+    Model(string const& path, int len, float* coef, float G): wingCalibCoefLen(len), wingCalibG(G)
     {
-        wingCalibCoef = new float[len];  //
+        pscene = new aiScene;
+        wingCalibCoef = new float[len];
         for (int i = 0; i < len; i++) {
             wingCalibCoef[i] = coef[i];
         }
         loadModel(path);
     }
 
+    Model(string const& path)
+    {
+        pscene = new aiScene;
+        loadModel(path);
+    }
+
     void saveModel(string const& path = "./model/output.obj") {
-        Assimp::Exporter::Export(scene, 'obj', path);
+        Assimp::Exporter exporter;
+        exporter.Export(pscene, "obj", path);
     }
 
     // draws the model, and thus all its meshes
@@ -72,19 +83,30 @@ public:
         }
     }
 
+    aiScene* combineModels(Model* model2) {
+        aiScene* output = NULL;
+        aiScene* output1 = new aiScene();
+        aiScene* output2 = new aiScene();
+        Assimp::SceneCombiner::CopyScene(&output1, pscene);
+        Assimp::SceneCombiner::CopyScene(&output2, model2->pscene);
+        vector<aiScene*>input;
+        input.push_back(output1);
+        input.push_back(output2);
+        Assimp::SceneCombiner::MergeScenes(&output, input);
+        return output;
+    }
+
 private:
     // loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
     void loadModel(string const& path)
     {
         // read file via ASSIMP
         Assimp::Importer importer;
-        scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
-        // TODO: 怎么就能在这赋值给const变量了，是什么时候初始化的？左值右值
-        // TODO: 为什么vs的任务列表不识别这个TODO
-        // TODO: 研究一下怎么用vscode
+        const aiScene* const_pscene = (importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace));
+        pscene = importer.GetOrphanedScene();
 
         // check for errors
-        if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // if is Not Zero
+        if (!pscene || pscene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !pscene->mRootNode) // if is Not Zero
         {
             cout << "ERROR::ASSIMP:: " << importer.GetErrorString() << endl;
             return;
@@ -93,7 +115,7 @@ private:
         directory = path.substr(0, path.find_last_of('/'));
 
         // process ASSIMP's root node recursively
-        processNode(scene->mRootNode, scene);
+        processNode(pscene->mRootNode, pscene);
     }
 
     // processes a node in a recursive fashion. Processes each individual mesh located at the node and repeats this process on its children nodes (if any).
@@ -132,7 +154,10 @@ private:
             vector.x() = mesh->mVertices[i].x;
             vector.y() = mesh->mVertices[i].y;
             vector.z() = mesh->mVertices[i].z;
-            if(wingCalibCoefLen) vector = wingTransform(vector);
+            if (wingCalibCoefLen) {
+                vector = wingTransform(vector);
+                mesh->mVertices[i].z = vector.z();
+            }
             vertex.Position = vector;
             // normals
             if (mesh->HasNormals())
@@ -213,9 +238,8 @@ private:
             z_calib_mm = z_calib_mm * x_mm;
             z_calib_mm = z_calib_mm + wingCalibCoef[a];
         }
-        z_calib_inch = z_calib_mm / 254;
-        vec.z() = vec.z() + z_calib_inch;
-        //vec.z() = 200;
+        z_calib_inch = z_calib_mm / 25.4;
+        vec.z() = vec.z() + z_calib_inch * (wingCalibG / 2.5);
         return vec;
     }
 
@@ -273,6 +297,7 @@ inline unsigned int TextureFromFile(const char* path, const string& directory, b
             format = GL_RGB;
         else if (nrComponents == 4)
             format = GL_RGBA;
+        else return 0;
 
         glBindTexture(GL_TEXTURE_2D, textureID);
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);

@@ -35,6 +35,7 @@ void custom_glfwInit(CameraPara& C) {
 }
 
 int main(){
+
     clock_t start, end;
     start = clock();
 
@@ -60,10 +61,10 @@ int main(){
     Shader wingShader("wingShader.vs", "objectShader.fs");
     float coefficient[] = { -6.279e-23, 1.302e-28, 4.245e-14, 2.873e-19, 2.453e-06, -5.177e-11, -54.852 };
 
-    Model wingModel("./model/wing.obj", 7, coefficient);
-    wingModel.saveModel();
+    Model wingModel("./model/wing.obj", 7, coefficient, 2.5);
     Model bodyModel("./model/body.obj");
-    //wingModel.wingTransform(coefficient, 7);
+    Assimp::Exporter exporter;
+    exporter.Export(wingModel.combineModels(&bodyModel), "obj", "./model/output.obj");
 
     render.setSM(&wingShader, &bodyShader, &wingModel, &bodyModel);
     render.setbgImage("origin2.png");
