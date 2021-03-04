@@ -26,6 +26,7 @@ public:
             bodyShader->setMat4("view", view);
             wingShader->setMat4("perspective", perspective);
             wingShader->setMat4("view", view);
+            wingShader->setFloat("G", G);
         }
     }
     void setSM(Shader* wingS, Shader* bodyS, Model* wingM, Model* bodyM) {
@@ -40,6 +41,7 @@ public:
     void draw(int parameter);
     void generateImage(const char* filepath = "output.png");
     void getDepthInfo();
+    float G = 0;
 private:
     Camera* camera;
     Shader* bodyShader = NULL;
@@ -212,7 +214,8 @@ void Render::draw(int parameter){
     wingShader->setMat4("perspective", perspective);
     wingShader->setMat4("view", view);
     wingShader->setMat4("model", modelMatrix);
-    wingModel->Draw(*bodyShader);
+    wingShader->setFloat("G", G);
+    wingModel->Draw(*wingShader);
 
     if (parameter == WZM_MSAA_ENABLE) {
         glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);

@@ -59,16 +59,18 @@ int main(){
     Render render(&ourCamera);
     Shader bodyShader("objectShader.vs", "objectShader.fs");
     Shader wingShader("wingShader.vs", "objectShader.fs");
-    float coefficient[] = { -6.279e-23, 1.302e-28, 4.245e-14, 2.873e-19, 2.453e-06, -5.177e-11, -54.852 };
+    float coefficientFront[] = { -6.279e-23, 1.302e-28, 4.245e-14, 2.873e-19, 2.453e-06, -5.177e-11, -54.852 };
+    float coefficientBack[] = { -5.503e-23, -8.618e-21, 3.599e-14, 5.498e-12, 3.816e-06, -3.007e-04, -66.54 };
 
-    Model wingModel("./model/wing.obj", 7, coefficient, 2.5);
+    //Model wingModel("./model/wing.obj", 7, coefficientFront, coefficientBack, 2.5);
     Model bodyModel("./model/body.obj");
-    Assimp::Exporter exporter;
-    exporter.Export(wingModel.combineModels(&bodyModel), "obj", "./model/output.obj");
+    Model wingModel("./model/wing.obj");
+    //wingModel.combineModels(&bodyModel, true);
 
     render.setSM(&wingShader, &bodyShader, &wingModel, &bodyModel);
     render.setbgImage("origin2.png");
     render.setFrameBuffer(WZM_MSAA_DISABLE);
+    render.G = 0.25;
 
     render.setModelTransform(0, 0, 0, 0, 0, 0, 0.0254);
     render.draw(WZM_MSAA_DISABLE);

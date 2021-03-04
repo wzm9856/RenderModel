@@ -31,16 +31,19 @@ public:
     string directory;
     aiScene* pscene;
     int wingCalibCoefLen;
-    float* wingCalibCoef;
+    float* wingCalibCoefFront;
+    float* wingCalibCoefBack;
     float wingCalibG;
 
     // constructor, expects a filepath to a 3D model.
-    Model(string const& path, int len, float* coef, float G): wingCalibCoefLen(len), wingCalibG(G)
+    Model(string const& path, int len, float* coefFront, float* coefBack, float G): wingCalibCoefLen(len), wingCalibG(G)
     {
         pscene = new aiScene;
-        wingCalibCoef = new float[len];
+        wingCalibCoefFront = new float[len];
+        wingCalibCoefBack = new float[len];
         for (int i = 0; i < len; i++) {
-            wingCalibCoef[i] = coef[i];
+            wingCalibCoefFront[i] = coefFront[i];
+            wingCalibCoefBack[i] = coefBack[i];
         }
         loadModel(path);
     }
@@ -83,7 +86,7 @@ public:
         }
     }
 
-    aiScene* combineModels(Model* model2) {
+    aiScene* combineModels(Model* model2, bool isOutput=false) {
         aiScene* output = NULL;
         aiScene* output1 = new aiScene();
         aiScene* output2 = new aiScene();
@@ -93,6 +96,10 @@ public:
         input.push_back(output1);
         input.push_back(output2);
         Assimp::SceneCombiner::MergeScenes(&output, input);
+        if (isOutput) {
+            Assimp::Exporter exporter;
+            exporter.Export(output, "obj", "./model/output.obj");
+        }
         return output;
     }
 
@@ -231,16 +238,28 @@ private:
     }
 
     Eigen::Vector3f wingTransform(Eigen::Vector3f vec) {
-        float x_mm, z_calib_mm, z_calib_inch;
+        float x_mm, z_calib_mm_front, z_calib_mm_back, z_calib_mm_total, z_calib_inch, y_front, y_back;
         x_mm = vec.x() * 25.4;
-        z_calib_mm = 0;
-        for (int a = 0; a < wingCalibCoefLen; a++) {
-            z_calib_mm = z_calib_mm * x_mm;
-            z_calib_mm = z_calib_mm + wingCalibCoef[a];
-        }
-        z_calib_inch = z_calib_mm / 25.4;
+        z_calib_mm_front = calculatePolynomial(wingCalibCoefFront, wingCalibCoefLen, x_mm);
+        z_calib_mm_back = calculatePolynomial(wingCalibCoefBack, wingCalibCoefLen, x_mm);
+        float linePoseFront[] = { -0.5192, 243.9 };
+        float linePoseBack[] = { -2.907e-16, 6.746e-16, 1.491e-10, -4.031e-10, -0.000323, 3.6e-05, -31.02 };
+        y_front = calculatePolynomial(linePoseFront, 2, (vec.x() > 0 ? vec.x() : -vec.x()));
+        y_back = calculatePolynomial(linePoseBack, 7, vec.x());
+        float ratio = (y_front - vec.y()) / (y_front - y_back);
+        z_calib_mm_total = z_calib_mm_front * ratio + z_calib_mm_back * (1 - ratio);
+        z_calib_inch = z_calib_mm_total / 25.4;
         vec.z() = vec.z() + z_calib_inch * (wingCalibG / 2.5);
         return vec;
+    }
+
+    float calculatePolynomial(float* coef, int len, float x) {
+        float output = 0;
+        for (int a = 0; a < len; a++) {
+            output = output * x;
+            output = output + coef[a];
+        }
+        return output;
     }
 
     // checks all material textures of a given type and loads the textures if they're not loaded yet.
