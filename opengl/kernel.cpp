@@ -5,10 +5,10 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <time.h>
-#include <stb_image_write.h>
 #include <Eigen/Dense>
 #include <Eigen/Geometry> 
 #include <iostream>
+#include "stb_image_write.h"
 #include "shader.h"
 #include "model.h"
 #include "camera.h"
@@ -34,7 +34,7 @@ void custom_glfwInit(CameraPara& C) {
     }
 }
 
-int main(){
+int main() {
 
     clock_t start, end;
     start = clock();
@@ -51,33 +51,35 @@ int main(){
         -0.01408948749303818, 0.07451639324426651, 0.9971202611923218, 2.110600709915161,
         -0.08131846040487289, 0.9938305616378784, -0.0754195973277092, -4556.015625,
         0, 0, 0, 1;
-
-
     Camera ourCamera(viewmat);
-
     ourCamera.setCameraPara(C);
-    Render render(&ourCamera);
-    Shader bodyShader("objectShader.vs", "objectShader.fs");
-    Shader wingShader("wingShader.vs", "objectShader.fs");
-    float coefficientFront[] = { -6.279e-23, 1.302e-28, 4.245e-14, 2.873e-19, 2.453e-06, -5.177e-11, -54.852 };
-    float coefficientBack[] = { -5.503e-23, -8.618e-21, 3.599e-14, 5.498e-12, 3.816e-06, -3.007e-04, -66.54 };
 
-    //Model wingModel("./model/wing.obj", 7, coefficientFront, coefficientBack, 2.5);
+    //Model wingModel("./model/wing.obj", 7, 2.5);
     Model bodyModel("./model/body.obj");
     Model wingModel("./model/wing.obj");
     //wingModel.combineModels(&bodyModel, true);
 
-    render.setSM(&wingShader, &bodyShader, &wingModel, &bodyModel);
-    render.setbgImage("origin2.png");
-    render.setFrameBuffer(WZM_MSAA_DISABLE);
-    render.G = 0.25;
+    ModelTransformDesc td;
+    td.scale = 0.0254;
 
-    render.setModelTransform(0, 0, 0, 0, 0, 0, 0.0254);
-    render.draw(WZM_MSAA_DISABLE);
-    render.generateImage();
-    render.getDepthInfo();
+    RenderDesc desc;
+    desc.bodyModel = &bodyModel;
+    desc.wingModel = &wingModel;
+    desc.camera = &ourCamera;
+    desc.tranDesc = &td;
+    desc.bgImagePath = "origin2.png";
+    desc.isMSAAEnable = false;
+    desc.isRenderBackGround = false;
+    desc.isRenderGrayImage = true;
+
+    Render render(desc);
+    render.draw();
+    render.generateImage("output.png");
+    //render.getDepthInfo();
 
     end = clock();
-    cout << (end - start) / 1000 << endl;
+    std::cout << (float)(end - start) / 1000 << std::endl;
+
+    int a;
 }
 

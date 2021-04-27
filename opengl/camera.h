@@ -26,7 +26,7 @@ public:
     Camera(CameraPara Camerapara,
         V3f position = V3f(0.0f, 0.0f, 3.0f), V3f up = V3f(0.0f, 1.0f, 0.0f),
         float yaw = -90, float pitch = 0)
-    {
+	{
         C = Camerapara;
         Position = position;
         WorldUp = up;

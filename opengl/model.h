@@ -20,41 +20,36 @@
 #include <map>
 #include <vector>
 
-unsigned int TextureFromFile(const char* path, const string& directory, bool gamma = false);
+unsigned int TextureFromFile(const char* path, const std::string& directory, bool gamma = false);
 
 class Model
 {
 public:
     // model data 
-    vector<Texture> textures_loaded;	// stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
-    vector<Mesh>    meshes;
-    string directory;
+    std::vector<Texture> textures_loaded;	// stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
+    std::vector<Mesh>    meshes;
+    std::string directory;
     aiScene* pscene;
     int wingCalibCoefLen;
-    float* wingCalibCoefFront;
-    float* wingCalibCoefBack;
+    float wingCalibCoefFront[7] = { -6.279e-23, 1.302e-28, 4.245e-14, 2.873e-19, 2.453e-06, -5.177e-11, -54.852 };
+    float wingCalibCoefBack[7] = { -5.503e-23, -8.618e-21, 3.599e-14, 5.498e-12, 3.816e-06, -3.007e-04, -66.54 };
     float wingCalibG;
 
     // constructor, expects a filepath to a 3D model.
-    Model(string const& path, int len, float* coefFront, float* coefBack, float G): wingCalibCoefLen(len), wingCalibG(G)
+    Model(std::string const& path, int len, float G): wingCalibCoefLen(len), wingCalibG(G)
     {
+        // expects a wing model that needs to be calibrated
         pscene = new aiScene;
-        wingCalibCoefFront = new float[len];
-        wingCalibCoefBack = new float[len];
-        for (int i = 0; i < len; i++) {
-            wingCalibCoefFront[i] = coefFront[i];
-            wingCalibCoefBack[i] = coefBack[i];
-        }
         loadModel(path);
     }
 
-    Model(string const& path)
+    Model(std::string const& path)
     {
         pscene = new aiScene;
         loadModel(path);
     }
 
-    void saveModel(string const& path = "./model/output.obj") {
+    void saveModel(std::string const& path = "./model/output.obj") {
         Assimp::Exporter exporter;
         exporter.Export(pscene, "obj", path);
     }
@@ -92,7 +87,7 @@ public:
         aiScene* output2 = new aiScene();
         Assimp::SceneCombiner::CopyScene(&output1, pscene);
         Assimp::SceneCombiner::CopyScene(&output2, model2->pscene);
-        vector<aiScene*>input;
+        std::vector<aiScene*>input;
         input.push_back(output1);
         input.push_back(output2);
         Assimp::SceneCombiner::MergeScenes(&output, input);
@@ -105,7 +100,7 @@ public:
 
 private:
     // loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
-    void loadModel(string const& path)
+    void loadModel(std::string const& path)
     {
         // read file via ASSIMP
         Assimp::Importer importer;
@@ -115,7 +110,7 @@ private:
         // check for errors
         if (!pscene || pscene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !pscene->mRootNode) // if is Not Zero
         {
-            cout << "ERROR::ASSIMP:: " << importer.GetErrorString() << endl;
+            std::cout << "ERROR::ASSIMP:: " << importer.GetErrorString() << std::endl;
             return;
         }
         // retrieve the directory path of the filepath
@@ -147,9 +142,9 @@ private:
     Mesh processMesh(aiMesh* mesh, const aiScene* scene)
     {
         // data to fill
-        vector<Vertex> vertices;
-        vector<unsigned int> indices;
-        vector<Texture> textures;
+        std::vector<Vertex> vertices;
+        std::vector<unsigned int> indices;
+        std::vector<Texture> textures;
         aiColor4D colors;
 
         // walk through each of the mesh's vertices
@@ -221,10 +216,10 @@ private:
         // normal: texture_normalN
 
         // 1. diffuse maps
-        vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
+        std::vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
         textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
         // 2. specular maps
-        vector<Texture> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
+        std::vector<Texture> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
         textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
         // 3. normal maps
         std::vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal");
@@ -264,9 +259,9 @@ private:
 
     // checks all material textures of a given type and loads the textures if they're not loaded yet.
     // the required info is returned as a Texture struct.
-    vector<Texture> loadMaterialTextures(aiMaterial* mat, aiTextureType type, string typeName)
+    std::vector<Texture> loadMaterialTextures(aiMaterial* mat, aiTextureType type, std::string typeName)
     {
-        vector<Texture> textures;
+        std::vector<Texture> textures;
         for (unsigned int i = 0; i < mat->GetTextureCount(type); i++)
         {
             aiString str;
@@ -297,9 +292,9 @@ private:
 };
 
 
-inline unsigned int TextureFromFile(const char* path, const string& directory, bool gamma)
+inline unsigned int TextureFromFile(const char* path, const std::string& directory, bool gamma)
 {
-    string filename = string(path);
+    std::string filename = std::string(path);
     filename = directory + '/' + filename;
 
     unsigned int textureID;
